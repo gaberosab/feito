@@ -646,7 +646,7 @@ const CONFIG = {
           if (!rows.length) throw new Error("arquivo sem tarefas"); const { error } = await sb.from("colecoes").upsert(rows); if (error) throw error; res(); }
           catch(err){ el.querySelector("#ag-msg").textContent = "Não consegui ler: " + (err.message || err); } }; });
     }
-    document.getElementById("authgate").hidden = true; initGoogle(); pronto(); rodape();
+    const agEl = document.getElementById("authgate"); if (agEl) agEl.hidden = true; initGoogle(); pronto(); rodape();
   }
   function atualizarBotao(){ const b = document.getElementById("ag-g"); if (b) b.textContent = lerTok() ? "Google Agenda ligada" : "Conectar Google Agenda"; }
   function rodape(){
