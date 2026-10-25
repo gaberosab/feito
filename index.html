@@ -1267,7 +1267,7 @@ async function salvarRascunhos(){
 /* ---------- editor ---------- */
 let ED = null; // {t, antes, idx (rascunho), slots, slotsErr, buscando, armed}
 function abrirEditor(t, opts = {}){
-  ED = {t: JSON.parse(JSON.stringify(t)), antes: opts.rascunho != null ? null : t, idx: opts.rascunho ?? null, slots:null, slotsErr:null, buscando:false, armed:false};
+  ED = {t: JSON.parse(JSON.stringify(t)), antes: opts.rascunho != null || !t.id ? null : t, idx: opts.rascunho ?? null, slots:null, slotsErr:null, buscando:false, armed:false};
   renderEditor();
   setTimeout(() => $("#e_titulo")?.focus(), 30);
 }
