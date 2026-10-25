@@ -82,6 +82,7 @@ ul.tasks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
 .chip.today{background:var(--hl);color:var(--hl-ink)}
 .chip.gcal{color:var(--event)}
 .chip.err{color:var(--warn);background:var(--warn-soft)}
+.composer[hidden]{display:none!important}.fab{position:fixed;right:20px;bottom:calc(24px + env(safe-area-inset-bottom,0px));width:58px;height:58px;border-radius:50%;border:0;background:var(--accent);color:var(--accent-ink);font-size:34px;font-weight:700;line-height:1;box-shadow:0 8px 24px -8px rgba(0,0,0,.35);z-index:45;display:grid;place-items:center;padding:0 0 3px}@media (max-width:759px){.fab{bottom:calc(84px + env(safe-area-inset-bottom,0px))}}.t-side{display:flex;align-items:center;gap:2px}.t-ic{border:0;background:transparent;color:var(--muted);width:32px;height:32px;border-radius:10px;display:grid;place-items:center;padding:0}.t-ic svg{width:17px;height:17px}.t-ic:hover{background:var(--surface);color:var(--ink)}.t-ic.del.armed{background:var(--alta);color:#fff}
 .t-time{font-family:var(--f-mono);font-size:13px;color:var(--muted);padding-top:3px;white-space:nowrap}
 .empty{padding:28px 10px;text-align:center;color:var(--muted)}
 .empty b{display:block;color:var(--ink);font-family:var(--f-display);font-size:19px;font-weight:600;margin-bottom:4px}
@@ -443,7 +444,7 @@ body.v-materias .grid{grid-template-columns:minmax(0,1fr)}
     <span class="resumo" id="hojeResumo">Carregando suas tarefas…</span>
   </header>
 
-  <section class="composer" aria-label="Nova tarefa">
+  <section class="composer" aria-label="Nova tarefa" hidden>
     <div class="composer-row">
       <span class="ai-chip" id="aiChip" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/></svg>Com IA</span>
       <label for="cmp" class="sr">Escreva uma tarefa</label>
@@ -456,6 +457,7 @@ body.v-materias .grid{grid-template-columns:minmax(0,1fr)}
     <div class="preview" id="preview" hidden></div>
   </section>
 
+  <button class="fab" id="fabNova" aria-label="Nova tarefa" title="Nova tarefa">+</button>
   <div class="grid">
     <section class="panel" id="calPanel" aria-label="Calendário"></section>
     <section class="panel" id="alertPanel" aria-label="Alertas"></section>
@@ -651,8 +653,17 @@ const CONFIG = {
   function atualizarBotao(){ const b = document.getElementById("ag-g"); if (b) b.textContent = lerTok() ? "Google Agenda ligada" : "Conectar Google Agenda"; }
   function rodape(){
     const f = document.createElement("div"); f.className = "ag-foot";
-    f.innerHTML = `<span>${user.email}</span>${CONFIG.googleClientId ? '<button id="ag-g">Conectar Google Agenda</button>' : ''}<button id="ag-exp">Exportar dados</button><button id="ag-out">Sair</button>`;
+    f.innerHTML = `<span>${user.email}</span>${CONFIG.googleClientId ? '<button id="ag-g">Conectar Google Agenda</button>' : ''}<button id="ag-exp">Exportar dados</button><button id="ag-imp">Importar dados</button><input type="file" id="ag-impf" accept="application/json,.json" hidden><button id="ag-out">Sair</button>`;
     document.body.appendChild(f); atualizarBotao();
+    const fi = f.querySelector("#ag-impf"); f.querySelector("#ag-imp").onclick = () => fi.click();
+    fi.onchange = async () => { const fecha = el => { el.hidden = true; }; let j; try { j = JSON.parse(await fi.files[0].text()); } catch(e){ j = null; } fi.value = "";
+      if (Array.isArray(j)) j = { tarefas: j }; const rows = [];
+      if (j) for (const col of ["tarefas", "materias"]) (j[col] || []).forEach(d => { if (!d || typeof d !== "object") return; const { id, ...data } = d; rows.push({ user_id: user.id, col, id: id || ("t" + Date.now().toString(36) + Math.random().toString(36).slice(2,6)), data }); });
+      if (!rows.length){ const el = tela(`<div class="ag-card"><h2>Importar dados</h2><p>Não achei tarefas nesse arquivo. Use um arquivo gerado por "Exportar dados".</p><button type="button" class="ag-btn" id="ag-no">Fechar</button></div>`); el.querySelector("#ag-no").onclick = () => fecha(el); return; }
+      const nt = rows.filter(r => r.col === "tarefas").length, nm = rows.length - nt;
+      const el = tela(`<div class="ag-card"><h2>Importar dados?</h2><p>Vou trazer ${nt} tarefa${nt === 1 ? "" : "s"}${nm ? " e " + nm + " matéria" + (nm === 1 ? "" : "s") : ""}. As que já existem são atualizadas e nada é apagado.</p><button type="button" class="ag-btn" id="ag-ok">Importar</button><button type="button" class="ag-link" id="ag-no">Cancelar</button><p id="ag-msg" class="ag-msg"></p></div>`);
+      el.querySelector("#ag-no").onclick = () => fecha(el);
+      el.querySelector("#ag-ok").onclick = async () => { el.querySelector("#ag-msg").textContent = "Salvando…"; const { error } = await sb.from("colecoes").upsert(rows); if (error){ el.querySelector("#ag-msg").textContent = "Não consegui salvar: " + error.message; return; } location.reload(); }; };
     const g = f.querySelector("#ag-g"); if (g) g.onclick = () => window.__conectarGoogle();
     f.querySelector("#ag-out").onclick = async () => { await sb.auth.signOut(); location.reload(); };
     f.querySelector("#ag-exp").onclick = async () => { const { data } = await sb.from("colecoes").select("col,id,data").eq("user_id", user.id); const o = { tarefas: [], materias: [] };
@@ -725,6 +736,8 @@ const PRIO = {alta:"Alta",media:"Média",baixa:"Baixa"};
 
 /* ---------- ícones ---------- */
 const I = {
+  edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/></svg>',
+  trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/></svg>',
   check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
   rep:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 013-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 01-3 3H3"/></svg>',
   bell:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 003.4 0"/></svg>',
@@ -818,7 +831,7 @@ function itemHTML(t){
   return `<li class="task ${t.feito?"done":""}" data-id="${esc(t.id)}">
     <button class="check" style="--prio:${prio}" data-act="toggle" aria-label="${t.feito?"Desmarcar":"Concluir"}: ${esc(t.titulo)}">${I.check}</button>
     <button class="t-body" data-act="open"><div class="t-title">${esc(t.titulo)}</div>${t.notas?`<div class="t-notes">${esc(t.notas)}</div>`:""}${chipsDe(t)}</button>
-    <div class="t-time">${t.hora?esc(t.hora):""}</div>
+    <div class="t-side"><div class="t-time">${t.hora?esc(t.hora):""}</div><button class="t-ic" data-act="open" title="Editar" aria-label="Editar">${I.edit}</button><button class="t-ic del" data-act="del" title="Apagar" aria-label="Apagar">${I.trash}</button></div>
   </li>`;
 }
 const listHTML = arr => `<ul class="tasks">${arr.map(itemHTML).join("")}</ul>`;
@@ -1448,8 +1461,10 @@ function acaoTarefa(e){
   const t = S.tarefas.find(x => x.id === li.dataset.id); if (!t) return;
   if (a.dataset.act === "toggle") alternar(t);
   if (a.dataset.act === "open") abrirEditor(t);
+  if (a.dataset.act === "del"){ if (a.classList.contains("armed")) apagar(t); else { a.classList.add("armed"); a.title = "Toque de novo para apagar"; toast("Toque na lixeira de novo para apagar."); setTimeout(() => a.classList.remove("armed"), 3000); } }
 }
 $("#list").addEventListener("click", acaoTarefa);
+$("#fabNova").onclick = () => abrirEditor(novaTarefa({data: document.body.classList.contains("v-cal") && S.agDia ? S.agDia : hoje()}));
 $("#agenda").addEventListener("click", acaoTarefa);
 $("#agenda").addEventListener("keydown", e => { if (e.key === "Enter" && e.target.matches('[data-act="open"]')) acaoTarefa(e); });
 $("#agPrev").onclick = () => { S.agDia = addDias(S.agDia,-1); $("#planOut").textContent = ""; watchAgenda(); };
