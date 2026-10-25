@@ -440,7 +440,7 @@ body.v-materias .grid{grid-template-columns:minmax(0,1fr)}
 
 <div class="wrap">
   <header class="top">
-    <h1 class="hello"><span id="saud">Olá, Gabe</span><small id="hojeLabel">Hoje</small></h1>
+    <h1 class="hello"><span id="saud">Olá</span><small id="hojeLabel">Hoje</small></h1>
     <span class="resumo" id="hojeResumo">Carregando suas tarefas…</span>
   </header>
 
@@ -493,6 +493,7 @@ body.v-materias .grid{grid-template-columns:minmax(0,1fr)}
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<script src="../metas/cores.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="https://accounts.google.com/gsi/client" async></script>
 <style>
@@ -512,7 +513,7 @@ body.v-materias .grid{grid-template-columns:minmax(0,1fr)}
 const CONFIG = {
   url: "https://foaeyitlklnpfhavrtxc.supabase.co",
   key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZvYWV5aXRsa2xucGZoYXZydHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI4OTY2OTYsImV4cCI6MjEwODQ3MjY5Nn0.ckY2WRNqneAmI1gt9u95ed9w_ieeqH6DJ41T6wKk8Qo",
-  googleClientId: ""   // opcional: ID do cliente OAuth do Google para ligar a Google Agenda (veja o LEIA-ME)
+  googleClientId: "265196454523-jou6t3c1mi4n12t60bhlvn4qtvg3e0jp.apps.googleusercontent.com"   // opcional: ID do cliente OAuth do Google para ligar a Google Agenda (veja o LEIA-ME)
 };
 /* ======================================================================= */
 (function(){
@@ -635,7 +636,7 @@ const CONFIG = {
       user = data.user; depois(); };
     el.querySelector("#ag-up").onclick = async () => { msg("Criando…");
       const { data, error } = await sb.auth.signUp({ email: el.querySelector("#ag-e").value.trim(), password: el.querySelector("#ag-p").value });
-      if (error){ msg(error.message); return; } if (data.session){ user = data.user; depois(); } else msg("Conta criada. Confirme pelo link do e-mail e toque em Entrar."); };
+      if (error){ msg(/database error|saving new user/i.test(error.message) ? "Esse e-mail ainda não está liberado. Peça para o Gabe liberar e tente de novo." : error.message); return; } if (data.session){ user = data.user; depois(); } else msg("Conta criada. Confirme pelo link do e-mail e toque em Entrar."); };
   }
   async function depois(){
     const { count } = await sb.from("colecoes").select("id", { count: "exact", head: true }).eq("user_id", user.id);
@@ -648,13 +649,13 @@ const CONFIG = {
           if (!rows.length) throw new Error("arquivo sem tarefas"); const { error } = await sb.from("colecoes").upsert(rows); if (error) throw error; res(); }
           catch(err){ el.querySelector("#ag-msg").textContent = "Não consegui ler: " + (err.message || err); } }; });
     }
-    const agEl = document.getElementById("authgate"); if (agEl) agEl.hidden = true; initGoogle(); pronto(); rodape();
+    const agEl = document.getElementById("authgate"); if (agEl) agEl.hidden = true; if (window.Cores) await Cores.iniciar(sb, user); initGoogle(); pronto(); rodape();
   }
   function atualizarBotao(){ const b = document.getElementById("ag-g"); if (b) b.textContent = lerTok() ? "Google Agenda ligada" : "Conectar Google Agenda"; }
   function rodape(){
     const f = document.createElement("div"); f.className = "ag-foot";
-    f.innerHTML = `<span>${user.email}</span>${CONFIG.googleClientId ? '<button id="ag-g">Conectar Google Agenda</button>' : ''}<button id="ag-exp">Exportar dados</button><button id="ag-imp">Importar dados</button><input type="file" id="ag-impf" accept="application/json,.json" hidden><button id="ag-out">Sair</button>`;
-    document.body.appendChild(f); atualizarBotao();
+    f.innerHTML = `<span>${user.email}</span>${CONFIG.googleClientId ? '<button id="ag-g">Conectar Google Agenda</button>' : ''}<button id="ag-cores">Cores</button><button id="ag-exp">Exportar dados</button><button id="ag-imp">Importar dados</button><input type="file" id="ag-impf" accept="application/json,.json" hidden><button id="ag-out">Sair</button>`;
+    document.body.appendChild(f); atualizarBotao(); f.querySelector("#ag-cores").onclick = () => window.Cores && Cores.abrir();
     const fi = f.querySelector("#ag-impf"); f.querySelector("#ag-imp").onclick = () => fi.click();
     fi.onchange = async () => { const fecha = el => { el.hidden = true; }; let j; try { j = JSON.parse(await fi.files[0].text()); } catch(e){ j = null; } fi.value = "";
       if (Array.isArray(j)) j = { tarefas: j }; const rows = [];
@@ -800,7 +801,7 @@ function render(){
   const h = hoje(), g = grupos();
   $("#hojeLabel").textContent = rotuloLongo(h).replace(/^./, c => c.toUpperCase());
   const hr = hm2m(agoraHM());
-  $("#saud").textContent = (hr < 12*60 ? "Bom dia" : hr < 18*60 ? "Boa tarde" : "Boa noite") + ", Gabe";
+  $("#saud").textContent = (hr < 12*60 ? "Bom dia" : hr < 18*60 ? "Boa tarde" : "Boa noite") + (window.__nome ? ", " + window.__nome : "");
   if (S.carregado && !S.dbErro){
     const n = g.hoje.length, a = g.atrasadas.length;
     $("#hojeResumo").textContent = n||a ? `${n} para hoje` + (a ? ` · ${a} atrasada${a>1?"s":""}` : "") : "Nada pendente para hoje";
